@@ -13,6 +13,7 @@ import { saveReport, getAllReports, deleteReport, getReportBlob, SavedReport } f
 import { GoogleGenAI } from "@google/genai";
 
 interface ReportData {
+  reportNo: string;
   date: string;
   customerName: string;
   address: string;
@@ -34,6 +35,7 @@ interface ReportData {
 }
 
 const initialData: ReportData = {
+  reportNo: '',
   date: new Date().toISOString().split('T')[0],
   customerName: '',
   address: '',
@@ -115,7 +117,7 @@ const ReportContent = React.forwardRef<HTMLDivElement, { data: ReportData }>(({ 
       </h2>
     </div>
 
-    <div className="flex justify-end mb-4 pr-4">
+    <div className="flex flex-col items-end mb-4 pr-4 gap-2">
       <div className="flex items-center text-sm font-bold">
         DATE:- 
         <span 
@@ -123,6 +125,15 @@ const ReportContent = React.forwardRef<HTMLDivElement, { data: ReportData }>(({ 
           style={{ borderBottom: '1px solid #000000', paddingBottom: '4px', marginLeft: '8px', lineHeight: '1.4' }}
         >
           {formatDate(data.date)}
+        </span>
+      </div>
+      <div className="flex items-center text-sm font-bold">
+        REPORT NO.:- 
+        <span 
+          className="font-normal px-6 inline-block min-w-[140px] text-center" 
+          style={{ borderBottom: '1px solid #000000', paddingBottom: '4px', marginLeft: '8px', lineHeight: '1.4' }}
+        >
+          {data.reportNo || '________________'}
         </span>
       </div>
     </div>
@@ -262,7 +273,37 @@ export default function App() {
   useEffect(() => {
     loadHistory();
     checkStorageStatus();
+    
+    // Initialize report number if empty
+    if (!data.reportNo) {
+      const counter = parseInt(localStorage.getItem('reportCounter') || '0') + 1;
+      const date = new Date(data.date);
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yy = String(date.getFullYear()).slice(-2);
+      const newNo = `SE/FSR/${String(counter).padStart(3, '0')}-${dd}${mm}${yy}`;
+      setData(prev => ({ ...prev, reportNo: newNo }));
+    }
   }, []);
+
+  // Update report number date part if date changes
+  useEffect(() => {
+    if (data.reportNo) {
+      const date = new Date(data.date);
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yy = String(date.getFullYear()).slice(-2);
+      
+      const parts = data.reportNo.split('-');
+      if (parts.length === 2) {
+        const prefix = parts[0];
+        const newNo = `${prefix}-${dd}${mm}${yy}`;
+        if (newNo !== data.reportNo) {
+          setData(prev => ({ ...prev, reportNo: newNo }));
+        }
+      }
+    }
+  }, [data.date]);
 
   const checkStorageStatus = async () => {
     if (navigator.storage && navigator.storage.estimate) {
@@ -327,13 +368,23 @@ export default function App() {
         ? crypto.randomUUID() 
         : Date.now().toString(36) + Math.random().toString(36).substring(2);
 
+      const counter = parseInt(localStorage.getItem('reportCounter') || '0') + 1;
+      const date = new Date();
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yy = String(date.getFullYear()).slice(-2);
+      const newNo = `SE/FSR/${String(counter).padStart(3, '0')}-${dd}${mm}${yy}`;
+
       await saveReport({
         id: reportId,
+        reportNo: newNo,
         customerName: file.name.replace('.pdf', '').replace(/_/g, ' '),
         date: new Date().toISOString().split('T')[0],
         blob: file,
         timestamp: Date.now()
       });
+      
+      localStorage.setItem('reportCounter', counter.toString());
       loadHistory();
       checkStorageStatus();
       alert('Report imported successfully!');
@@ -349,8 +400,16 @@ export default function App() {
   };
 
   const loadSampleData = () => {
+    const counter = parseInt(localStorage.getItem('reportCounter') || '0') + 1;
+    const date = '2024-03-09';
+    const dd = '09';
+    const mm = '03';
+    const yy = '24';
+    const newNo = `SE/FSR/${String(counter).padStart(3, '0')}-${dd}${mm}${yy}`;
+
     setData({
-      date: '2024-03-09',
+      reportNo: newNo,
+      date: date,
       customerName: 'M/s ONE PRASTHA REALTY LLP',
       address: 'Tajpur, Murthal RD, Sonipat Haryana .',
       kvaRating: '82.5',
@@ -370,6 +429,26 @@ export default function App() {
       mobileNo: '9876543210',
     });
     signaturePadRef.current?.clear();
+  };
+
+  const resetForm = () => {
+    if (confirm('Are you sure you want to start a new report? This will clear the current form.')) {
+      const counter = parseInt(localStorage.getItem('reportCounter') || '0') + 1;
+      const date = new Date();
+      const dateStr = date.toISOString().split('T')[0];
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yy = String(date.getFullYear()).slice(-2);
+      const newNo = `SE/FSR/${String(counter).padStart(3, '0')}-${dd}${mm}${yy}`;
+      
+      setData({
+        ...initialData,
+        date: dateStr,
+        reportNo: newNo
+      });
+      signaturePadRef.current?.clear();
+      setActiveTab('form');
+    }
   };
 
   const handleAiAssist = async () => {
@@ -483,11 +562,20 @@ export default function App() {
 
       await saveReport({
         id: reportId,
+        reportNo: data.reportNo,
         customerName: data.customerName || 'Untitled Report',
         date: data.date,
         blob: blob,
         timestamp: Date.now()
       });
+      
+      // Increment report counter for next report
+      const currentCounter = parseInt(localStorage.getItem('reportCounter') || '0');
+      const reportCounterPart = data.reportNo.split('/')[2]?.split('-')[0];
+      if (reportCounterPart && parseInt(reportCounterPart) > currentCounter) {
+        localStorage.setItem('reportCounter', reportCounterPart);
+      }
+
       loadHistory();
 
       setPdfBlob(blob);
@@ -588,6 +676,13 @@ export default function App() {
             >
               <History className="mr-2 h-4 w-4" />
               History
+            </button>
+            <button
+              onClick={resetForm}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-xl shadow-sm text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+            >
+              <FileText className="mr-2 h-4 w-4 text-indigo-500" />
+              New Report
             </button>
             <button
               onClick={loadSampleData}
@@ -733,7 +828,10 @@ export default function App() {
                           </button>
                         </div>
                         <h3 className="font-bold text-slate-900 truncate mb-1">{item.customerName}</h3>
-                        <p className="text-xs text-slate-500 mb-4">{formatDate(item.date)}</p>
+                        <div className="flex justify-between items-center mb-4">
+                          <p className="text-xs text-slate-500">{formatDate(item.date)}</p>
+                          <p className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{item.reportNo}</p>
+                        </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleViewHistory(item)}
@@ -783,6 +881,15 @@ export default function App() {
               </h2>
             </div>
             <div className="p-4 sm:p-6 space-y-6 xl:max-h-[calc(100vh-300px)] xl:overflow-y-auto custom-scrollbar">
+              {/* Report Number (Read-only) */}
+              <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Report Number</span>
+                </div>
+                <span className="text-sm font-mono font-bold text-indigo-600">{data.reportNo}</span>
+              </div>
+
               {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">

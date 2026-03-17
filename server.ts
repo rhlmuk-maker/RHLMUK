@@ -20,6 +20,7 @@ async function startServer() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS reports (
       id TEXT PRIMARY KEY,
+      reportNo TEXT,
       customerName TEXT,
       date TEXT,
       blob_data BLOB,
@@ -30,7 +31,7 @@ async function startServer() {
   // API Routes
   app.get('/api/reports', (req, res) => {
     try {
-      const reports = db.prepare('SELECT id, customerName, date, timestamp FROM reports ORDER BY timestamp DESC').all();
+      const reports = db.prepare('SELECT id, reportNo, customerName, date, timestamp FROM reports ORDER BY timestamp DESC').all();
       res.json(reports);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch reports' });
@@ -51,14 +52,14 @@ async function startServer() {
   });
 
   app.post('/api/reports', express.raw({ type: 'application/pdf', limit: '10mb' }), (req, res) => {
-    const { id, customerName, date } = req.query;
-    if (!id || !customerName || !date) {
+    const { id, reportNo, customerName, date } = req.query;
+    if (!id || !reportNo || !customerName || !date) {
       return res.status(400).json({ error: 'Missing metadata' });
     }
 
     try {
-      const stmt = db.prepare('INSERT OR REPLACE INTO reports (id, customerName, date, blob_data, timestamp) VALUES (?, ?, ?, ?, ?)');
-      stmt.run(id, customerName, date, req.body, Date.now());
+      const stmt = db.prepare('INSERT OR REPLACE INTO reports (id, reportNo, customerName, date, blob_data, timestamp) VALUES (?, ?, ?, ?, ?, ?)');
+      stmt.run(id, reportNo, customerName, date, req.body, Date.now());
       res.json({ success: true });
     } catch (error) {
       console.error('Save error:', error);

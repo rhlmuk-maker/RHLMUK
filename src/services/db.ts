@@ -2,6 +2,7 @@ import { openDB, IDBPDatabase } from 'idb';
 
 export interface SavedReport {
   id: string;
+  reportNo: string;
   customerName: string;
   date: string;
   blob: Blob;
@@ -24,7 +25,7 @@ const initDB = async () => {
 export const saveReport = async (report: SavedReport) => {
   try {
     // Try saving to server first (if backend exists)
-    const response = await fetch(`/api/reports?id=${encodeURIComponent(report.id)}&customerName=${encodeURIComponent(report.customerName)}&date=${encodeURIComponent(report.date)}`, {
+    const response = await fetch(`/api/reports?id=${encodeURIComponent(report.id)}&reportNo=${encodeURIComponent(report.reportNo)}&customerName=${encodeURIComponent(report.customerName)}&date=${encodeURIComponent(report.date)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/pdf',
