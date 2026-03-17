@@ -429,24 +429,42 @@ export default function App() {
 
     setIsGenerating(true);
     try {
+      if (!captureRef.current) {
+        throw new Error('Capture reference not found');
+      }
+
       // Small delay to ensure any pending renders are complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const canvas = await html2canvas(captureRef.current, {
-        scale: isMobile ? 2 : 3, // Lower scale on mobile to save memory
+        scale: isMobile ? 1.2 : 2, // Further reduced scale for mobile
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        width: captureRef.current.offsetWidth,
-        height: captureRef.current.offsetHeight,
-        allowTaint: true,
+        windowWidth: 794,
+        windowHeight: 1123,
+        onclone: (clonedDoc) => {
+          const element = clonedDoc.getElementById('pdf-capture-element');
+          if (element) {
+            element.style.display = 'block';
+            element.style.visibility = 'visible';
+            element.style.position = 'relative';
+            element.style.left = '0';
+            element.style.top = '0';
+          }
+        }
       });
+
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas rendering failed or resulted in empty output');
+      }
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85); // Lower quality to save memory
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4'
+        format: 'a4',
+        compress: true
       });
       
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -497,7 +515,8 @@ export default function App() {
     } catch (error) {
       console.error('Error generating PDF:', error);
       if (pdfWindow) pdfWindow.close();
-      alert('Failed to generate PDF. This can happen if the report is too large or device memory is low. Try again or reduce the amount of text in remarks.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to generate PDF: ${errorMessage}. This can happen if the report is too large or device memory is low. Try reducing the amount of text in remarks or closing other browser tabs.`);
     } finally {
       setIsGenerating(false);
     }
@@ -1081,7 +1100,7 @@ export default function App() {
     </div>
 
       {/* Hidden container for PDF capture - always 1:1 scale */}
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', overflow: 'hidden', width: '210mm', height: '297mm' }}>
+      <div id="pdf-capture-element" style={{ position: 'absolute', left: '-9999px', top: '-9999px', overflow: 'hidden', width: '210mm', height: '297mm' }}>
         <ReportContent ref={captureRef} data={data} />
       </div>
 
