@@ -1,0 +1,5 @@
+{
+  "name": "Remix: Field Service Report Pro",
+  "description": "A professional field service report generator with PDF export, local storage history, and file management capabilities.",
+  "requestFramePermissions": []
+}
